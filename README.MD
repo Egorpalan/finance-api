@@ -31,8 +31,7 @@
    curl -X POST "http://localhost:8080/balance/top-up" -H "Content-Type: application/json" -d '{
     "user_id": 1,
     "amount": 50.00
-
-}'
+   }'
 
 3. Перевод денег
     ```bash
