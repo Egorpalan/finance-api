@@ -20,7 +20,7 @@
 
 1. Создание пользователя
     ```bash
-    ccurl -X POST "http://localhost:8080/user" -H "Content-Type: application/json" -d '{
+    curl -X POST "http://localhost:8080/user" -H "Content-Type: application/json" -d '{
     "balance": 100.00
     }'
 

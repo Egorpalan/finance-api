@@ -59,7 +59,6 @@ func (h *Handler) TransferMoney(c *gin.Context) {
 func (h *Handler) GetTransactions(c *gin.Context) {
 	userID := c.Param("user_id")
 
-	// Конвертируем userID в int64
 	userIDInt64, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
@@ -91,7 +90,6 @@ func (h *Handler) CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	// Ответ клиенту
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      user.ID,
 		"balance": user.Balance,

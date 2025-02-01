@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"github.com/Egorpalan/finance-api/internal/model"
 	"github.com/Egorpalan/finance-api/internal/repository"
@@ -16,13 +17,21 @@ func NewService(repo repository.RepositoryInterface) *Service {
 }
 
 func (s *Service) TopUpBalance(userID int64, amount float64) error {
-	user, err := s.repo.GetUserByID(userID)
+	ctx := context.Background()
+
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
 	user.Balance += amount
-	err = s.repo.UpdateUserBalance(user)
+	err = s.repo.UpdateUserBalance(ctx, tx, user)
 	if err != nil {
 		return err
 	}
@@ -32,13 +41,14 @@ func (s *Service) TopUpBalance(userID int64, amount float64) error {
 		ReceiverID:      userID,
 		Amount:          amount,
 		TransactionType: "top_up",
+		Timestamp:       time.Now(),
 	}
-	err = s.repo.AddTransaction(transaction)
+	err = s.repo.AddTransaction(ctx, tx, transaction)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (s *Service) TransferMoney(senderID, receiverID int64, amount float64) error {
@@ -46,12 +56,19 @@ func (s *Service) TransferMoney(senderID, receiverID int64, amount float64) erro
 		return errors.New("amount must be positive")
 	}
 
-	sender, err := s.repo.GetUserByID(senderID)
+	ctx := context.Background()
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	sender, err := s.repo.GetUserByID(ctx, senderID)
 	if err != nil {
 		return err
 	}
 
-	receiver, err := s.repo.GetUserByID(receiverID)
+	receiver, err := s.repo.GetUserByID(ctx, receiverID)
 	if err != nil {
 		return err
 	}
@@ -63,10 +80,10 @@ func (s *Service) TransferMoney(senderID, receiverID int64, amount float64) erro
 	sender.Balance -= amount
 	receiver.Balance += amount
 
-	if err := s.repo.UpdateUserBalance(sender); err != nil {
+	if err := s.repo.UpdateUserBalance(ctx, tx, sender); err != nil {
 		return err
 	}
-	if err := s.repo.UpdateUserBalance(receiver); err != nil {
+	if err := s.repo.UpdateUserBalance(ctx, tx, receiver); err != nil {
 		return err
 	}
 
@@ -85,25 +102,22 @@ func (s *Service) TransferMoney(senderID, receiverID int64, amount float64) erro
 		Timestamp:       time.Now(),
 	}
 
-	if err := s.repo.AddTransaction(transactionSender); err != nil {
+	if err := s.repo.AddTransaction(ctx, tx, transactionSender); err != nil {
 		return err
 	}
-	if err := s.repo.AddTransaction(transactionReceiver); err != nil {
+	if err := s.repo.AddTransaction(ctx, tx, transactionReceiver); err != nil {
 		return err
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (s *Service) GetTransactions(userID int64) ([]model.Transaction, error) {
-	transactions, err := s.repo.GetUserTransactions(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return transactions, nil
+	ctx := context.Background()
+	return s.repo.GetUserTransactions(ctx, userID)
 }
 
 func (s *Service) CreateUser(balance float64) (*model.User, error) {
-	return s.repo.CreateUser(balance)
+	ctx := context.Background()
+	return s.repo.CreateUser(ctx, balance)
 }
