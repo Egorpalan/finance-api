@@ -3,7 +3,7 @@
 1. **Клонируйте репозиторий:**
 
    ```bash
-   git clone git clone https://github.com/Egorpalan/finance-api.git
+   git clone git@github.com:Egorpalan/finance-api.git
    cd finance-api
 
 2. Запустите приложение
