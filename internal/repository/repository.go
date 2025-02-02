@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Egorpalan/finance-api/internal/model"
 	"github.com/jackc/pgx/v5"
@@ -11,10 +12,11 @@ import (
 type RepositoryInterface interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	GetUserByID(ctx context.Context, userID int64) (*model.User, error)
-	UpdateUserBalance(ctx context.Context, tx pgx.Tx, user *model.User) error
+	UpdateUserBalance(ctx context.Context, tx pgx.Tx, userID int64, amount float64) error
 	AddTransaction(ctx context.Context, tx pgx.Tx, transaction *model.Transaction) error
 	GetUserTransactions(ctx context.Context, userID int64) ([]model.Transaction, error)
 	CreateUser(ctx context.Context, balance float64) (*model.User, error)
+	GetUserByIDForUpdate(ctx context.Context, tx pgx.Tx, userID int64) (*model.User, error)
 }
 
 type Repository struct {
@@ -42,10 +44,16 @@ func (r *Repository) GetUserByID(ctx context.Context, userID int64) (*model.User
 	return &user, nil
 }
 
-func (r *Repository) UpdateUserBalance(ctx context.Context, tx pgx.Tx, user *model.User) error {
-	query := "UPDATE users SET balance=$1 WHERE id=$2"
-	_, err := tx.Exec(ctx, query, user.Balance, user.ID)
-	return err
+func (r *Repository) UpdateUserBalance(ctx context.Context, tx pgx.Tx, userID int64, amount float64) error {
+	query := "UPDATE users SET balance = balance + $1 WHERE id=$2 AND balance + $1 >= 0"
+	result, err := tx.Exec(ctx, query, amount, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("insufficient balance or user not found")
+	}
+	return nil
 }
 
 func (r *Repository) AddTransaction(ctx context.Context, tx pgx.Tx, transaction *model.Transaction) error {
@@ -81,6 +89,19 @@ func (r *Repository) CreateUser(ctx context.Context, balance float64) (*model.Us
 	err := r.db.QueryRow(ctx, query, balance).Scan(&user.ID, &user.Balance)
 	if err != nil {
 		return nil, fmt.Errorf("could not create user: %v", err)
+	}
+	return &user, nil
+}
+
+func (r *Repository) GetUserByIDForUpdate(ctx context.Context, tx pgx.Tx, userID int64) (*model.User, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("invalid user ID: %d", userID)
+	}
+	var user model.User
+	query := "SELECT id, balance FROM users WHERE id=$1 FOR UPDATE"
+	err := tx.QueryRow(ctx, query, userID).Scan(&user.ID, &user.Balance)
+	if err != nil {
+		return nil, fmt.Errorf("could not find user with id %d: %v", userID, err)
 	}
 	return &user, nil
 }

@@ -25,13 +25,12 @@ func (s *Service) TopUpBalance(userID int64, amount float64) error {
 	}
 	defer tx.Rollback(ctx)
 
-	user, err := s.repo.GetUserByID(ctx, userID)
+	_, err = s.repo.GetUserByIDForUpdate(ctx, tx, userID)
 	if err != nil {
 		return err
 	}
 
-	user.Balance += amount
-	err = s.repo.UpdateUserBalance(ctx, tx, user)
+	err = s.repo.UpdateUserBalance(ctx, tx, userID, amount)
 	if err != nil {
 		return err
 	}
@@ -63,12 +62,12 @@ func (s *Service) TransferMoney(senderID, receiverID int64, amount float64) erro
 	}
 	defer tx.Rollback(ctx)
 
-	sender, err := s.repo.GetUserByID(ctx, senderID)
+	sender, err := s.repo.GetUserByIDForUpdate(ctx, tx, senderID)
 	if err != nil {
 		return err
 	}
 
-	receiver, err := s.repo.GetUserByID(ctx, receiverID)
+	_, err = s.repo.GetUserByIDForUpdate(ctx, tx, receiverID)
 	if err != nil {
 		return err
 	}
@@ -77,13 +76,13 @@ func (s *Service) TransferMoney(senderID, receiverID int64, amount float64) erro
 		return errors.New("insufficient balance")
 	}
 
-	sender.Balance -= amount
-	receiver.Balance += amount
-
-	if err := s.repo.UpdateUserBalance(ctx, tx, sender); err != nil {
+	err = s.repo.UpdateUserBalance(ctx, tx, senderID, -amount)
+	if err != nil {
 		return err
 	}
-	if err := s.repo.UpdateUserBalance(ctx, tx, receiver); err != nil {
+
+	err = s.repo.UpdateUserBalance(ctx, tx, receiverID, amount)
+	if err != nil {
 		return err
 	}
 
